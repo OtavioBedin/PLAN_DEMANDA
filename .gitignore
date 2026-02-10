@@ -4,6 +4,7 @@
 03_INPUT_PAINEL/
 04_HISTORICO_PLANOS/
 05_PAINEL/
+06_VALIDACAO_ANNA/
 __pycache__/
 *.pyc
 *.log
