@@ -3,3 +3,8 @@ Gerar Duplicidade COD_PROD = 0088, devido a LINHA distinta, analisar a DIM_PRODU
 Problema com arquivo enviado ao Gabriel, onde por exempo o COD_PROD = 0088 tem duas demandas, do histórico e de novos produtos
 Tratamento: Precisa criar o Historico 3 meses para preencher demanda de lançamentos, porém excluir esse histórico da desagregação principal. Esse histórico do 0088 serve somente para preencher a demanda média dos produtos no lançamento, não deve fazer parte da distribuição da demanda
 
+
+URGENTE:
+
+COMBINAR E VALIDAR DADOS DE VENDAS COM ANNA E ALEX
+
