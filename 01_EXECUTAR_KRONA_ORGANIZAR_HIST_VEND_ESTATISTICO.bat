@@ -5,7 +5,7 @@ mode con: cols=140 lines=40
 set "PASTA_RAIZ=%~dp0"
 set "PASTA_SCRIPTS=%PASTA_RAIZ%00_SCRIPTS"
 set "PYTHON_EXE=%PASTA_RAIZ%.venv\Scripts\python.exe"
-set "ARQUIVO_PY=1_KRONA_ORGANIZAR_HIST_VEND_ESTATISTICO.py"
+set "ARQUIVO_PY=01_KRONA_ORGANIZAR_HIST_VEND_ESTATISTICO.py"
 
 echo.
 echo ============================================================
