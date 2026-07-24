@@ -61,7 +61,6 @@ pasta_validacao_anna = caminho_base.parent / '06_VALIDACAO_ANNA'
 
 print("✅ Setup e mapeamento de pastas concluídos com sucesso!")
 
-
 # %%
 # Carregar dados arquivo KRONA_REGRAS
 caminho_arquivo = arquivo_input_regras_negocio
@@ -133,10 +132,6 @@ if not arquivo_dim_produtos.exists():
         )
 else:
     print(f"✅ DIM_PRODUTOS_KRONA.parquet encontrada: {arquivo_dim_produtos}")
-
-print(f"✅ df_vendas_krona.parquet encontrado: {arquivo_vendas}")
-print("✅ Fontes mínimas validadas com sucesso!")
-
 
 # %%
 # FIXME: Código criado para adaptação ao Power BI (Python Script) — ajustes necessários para ambiente e estrutura de dados do cliente, solicitado pelo ALEX
