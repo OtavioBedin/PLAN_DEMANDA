@@ -119,6 +119,8 @@ df_volume_desag_regional.rename(columns={'VALOR': 'VOL_CONSENSO'}, inplace=True)
 # Calcular desagregação
 df_volume_desag_regional['VOL_CONSENSO_DESAGREGADO'] = df_volume_desag_regional['PARTIC'] * df_volume_desag_regional['VOL_CONSENSO']
 
+print("✅ Percentuais de desagregação calculados e concluídos!")
+
 # %%
 # Transformar plano desagregado e peças e criar  o formato final, incluindo as colunas necessárias
 df_plano_final_krona = df_volume_desag_regional.copy()
@@ -139,6 +141,8 @@ df_plano_final_krona['QTD_ESTATISTICO'] = df_plano_final_krona['VOL_ESTATISTICO'
 
 # Adicionar coluna de versão do plano
 df_plano_final_krona['CICLO'] = ciclo_plano
+
+print("✅ Desagregação do plano REGIONAL concluída!")
 
 # %%
 # Gerar saída previsão de vendas em excel, com colunas específicas para arquivo do Gabriel
@@ -162,6 +166,8 @@ for arquivo in pasta_staging_parquet.glob(f'plano_saida_gabriel_*.xlsx'):
 caminho_saida_excel = pasta_staging_parquet / f'plano_saida_gabriel_{ciclo_plano}.xlsx'
 df_plano_saida_gabriel.to_excel(caminho_saida_excel, index=False)
 
+print(f"✅ 'plano_saida_gabriel_{ciclo_plano}.xlsx' gerado com sucesso!")
+
 # %%
 # Gerar saída de novos produtos para arquivo do Gabriel 
 
@@ -175,6 +181,8 @@ for arquivo in pasta_staging_parquet.glob(f'plano_saida_gabriel_lancamentos_*.xl
 # Salvar arquivo Excel
 caminho_saida_excel_gabriel_lancamentos = pasta_staging_parquet / f'plano_saida_gabriel_lancamentos_{ciclo_plano}.xlsx'
 df_demanda_produtos_lancamento.to_excel(caminho_saida_excel_gabriel_lancamentos, index=False)
+
+print(f"✅ 'plano_saida_gabriel_lancamentos_{ciclo_plano}.xlsx' gerado com sucesso!")
 
 # %%
 # Gerar arquivo com estatístico e consenso solicitado pela Karol, porém unificando os dados em um unico arquivo
@@ -197,6 +205,8 @@ for arquivo in pasta_staging_parquet.glob(f'plano_saida_estatistico_consenso_*.x
 # Salvar arquivo Excel
 caminho_saida_excel_estatistico_consenso = pasta_staging_parquet / f'plano_saida_estatistico_consenso_{ciclo_plano}.xlsx'
 df_plan_estatistico_consenso.to_excel(caminho_saida_excel_estatistico_consenso, index=False)
+
+print(f"✅ 'plano_saida_estatistico_consenso_{ciclo_plano}.xlsx' gerado com sucesso!")
 
 # %%
 timer.finalizar()
