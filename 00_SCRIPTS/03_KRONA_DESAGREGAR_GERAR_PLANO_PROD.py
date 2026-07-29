@@ -33,33 +33,170 @@ pasta_historico_planos = caminho_base.parent / '04_HISTORICO_PLANOS'
 print("✅ Mapeamento de pastas concluído com sucesso!")
 
 # %%
-# FIXME: ATENÇÂO DEV:
-# Processo criado apenas para agregado por Regional, para acelerar o processo de enviar de dados para o Gabriel e Karolina
-# Verificar com Alex e Karol, o ponto de planejamento por cliente se irá continuar, para desenvolver essa parte
+# Carregando os planos agregados do painel, para pegar o ciclo mais recente
+# e a revisão mais recente para desagregar
 
-# %%
-# Carregando os planos agregados do painel, para pegar o ciclo mais recente, e a revisão mais recente, para desagregar
+# -------------------------------------------------------------------------
+# PLANO CONSENSO REGIONAL
+# -------------------------------------------------------------------------
 
-# Ler parquet plano agregado regional
-df_plano_consenso_regional = pd.read_parquet(pasta_historico_planos / 'BD_PLANO_AGREGADO_PAINEL_REGIONAL.parquet')
+arquivo_plano_regional = (
+    pasta_historico_planos /
+    'BD_PLANO_AGREGADO_PAINEL_REGIONAL.parquet'
+)
 
-# Retorna ultimo valor da coluna CICLO, para pegar o ciclo mais recente, classificando o PERIODO e a REVISAO
-ultimo_ciclo= df_plano_consenso_regional.sort_values(by=['PERIODO', 'REVISAO'], ascending=[False, False]).iloc[0]['CICLO']
-ultima_revisao = df_plano_consenso_regional.sort_values(by=['PERIODO', 'REVISAO'], ascending=[False, False]).iloc[0]['REVISAO']
+df_plano_consenso_regional = pd.read_parquet(
+    arquivo_plano_regional
+)
 
-# Filtrar os planos agregados para o ciclo mais recente e revisão mais recente
-df_plano_consenso_regional = df_plano_consenso_regional[(df_plano_consenso_regional['CICLO'] == ultimo_ciclo) & (df_plano_consenso_regional['REVISAO'] == ultima_revisao)]
+# Buscar ciclo e revisão mais recentes do plano regional
+registro_mais_recente = (
+    df_plano_consenso_regional
+    .sort_values(
+        by=['PERIODO', 'REVISAO'],
+        ascending=[False, False]
+    )
+    .iloc[0]
+)
 
-# Ler arquivo parquet de historico para desagregação
-df_forecast_vendas_krona_PRODUTO = pd.read_parquet(pasta_staging_parquet / 'df_forecast_vendas_krona_PRODUTO.parquet')
+ultimo_ciclo = registro_mais_recente['CICLO']
+ultima_revisao = registro_mais_recente['REVISAO']
 
-# Padronizar PERIODO como datetime
-df_plano_consenso_regional['PERIODO'] = pd.to_datetime(df_plano_consenso_regional['PERIODO'])
+# Filtrar plano regional
+df_plano_consenso_regional = (
+    df_plano_consenso_regional[
+        (df_plano_consenso_regional['CICLO'] == ultimo_ciclo) &
+        (df_plano_consenso_regional['REVISAO'] == ultima_revisao)
+    ]
+    .copy()
+)
 
-# Atualizar DESC_PROD, FAMILIA e LINHA para evitar a duplicidade conforme aconteceu com o COD_PROD 0088
-df_dim_produtos = pd.read_parquet(pasta_staging_parquet / 'DIM_PRODUTOS_KRONA.parquet')
+df_plano_consenso_regional['PERIODO'] = pd.to_datetime(
+    df_plano_consenso_regional['PERIODO']
+)
 
-dim_idx = df_dim_produtos.set_index('COD_PROD')
+# Agrupar plano regional
+colunas_agrupamento_regional = [
+    'REGIONAL_GESTOR',
+    'REGIONAL',
+    'FAMILIA',
+    'PERIODO',
+    'CICLO'
+]
+
+df_plano_consenso_regional_grouped = (
+    df_plano_consenso_regional
+    .groupby(
+        colunas_agrupamento_regional,
+        as_index=False
+    )['VALOR']
+    .sum()
+)
+
+ciclo_plano = ultimo_ciclo
+
+
+# -------------------------------------------------------------------------
+# PLANO CONSENSO CLIENTE
+# -------------------------------------------------------------------------
+
+arquivo_plano_cliente = (
+    pasta_historico_planos /
+    'BD_PLANO_AGREGADO_PAINEL_CLIENTE.parquet'
+)
+
+existe_plano_cliente = False
+df_plano_consenso_cliente_grouped = pd.DataFrame()
+
+if arquivo_plano_cliente.exists():
+
+    df_plano_consenso_cliente = pd.read_parquet(
+        arquivo_plano_cliente
+    )
+
+    if not df_plano_consenso_cliente.empty:
+
+        df_plano_consenso_cliente['PERIODO'] = pd.to_datetime(
+            df_plano_consenso_cliente['PERIODO']
+        )
+
+        # Utilizar o mesmo ciclo e revisão selecionados no regional
+        df_plano_consenso_cliente = (
+            df_plano_consenso_cliente[
+                (df_plano_consenso_cliente['CICLO'] == ultimo_ciclo) &
+                (
+                    df_plano_consenso_cliente['REVISAO']
+                    == ultima_revisao
+                )
+            ]
+            .copy()
+        )
+
+        # O arquivo pode existir, mas não ter planejamento
+        # para o ciclo/revisão atual
+        if not df_plano_consenso_cliente.empty:
+
+            colunas_agrupamento_cliente = [
+                'COD_CLIENTE',
+                'REGIONAL_GESTOR',
+                'REGIONAL',
+                'FAMILIA',
+                'PERIODO',
+                'CICLO'
+            ]
+
+            df_plano_consenso_cliente_grouped = (
+                df_plano_consenso_cliente
+                .groupby(
+                    colunas_agrupamento_cliente,
+                    as_index=False,
+                    dropna=False
+                )['VALOR']
+                .sum()
+            )
+
+            existe_plano_cliente = True
+
+
+# -------------------------------------------------------------------------
+# PREVISÃO ESTATÍSTICA POR PRODUTO
+# -------------------------------------------------------------------------
+
+df_forecast_vendas_krona_PRODUTO = pd.read_parquet(
+    pasta_staging_parquet /
+    'df_forecast_vendas_krona_PRODUTO.parquet'
+)
+
+df_forecast_vendas_krona_PRODUTO['PERIODO'] = pd.to_datetime(
+    df_forecast_vendas_krona_PRODUTO['PERIODO']
+)
+
+# Criar identificador único para preservar exatamente a mesma linha
+# entre a desagregação regional e a desagregação cliente
+df_forecast_vendas_krona_PRODUTO = (
+    df_forecast_vendas_krona_PRODUTO
+    .reset_index(drop=True)
+)
+
+df_forecast_vendas_krona_PRODUTO['ID_LINHA_DESAG'] = (
+    df_forecast_vendas_krona_PRODUTO.index
+)
+
+
+# -------------------------------------------------------------------------
+# ATUALIZAR DADOS DOS PRODUTOS
+# -------------------------------------------------------------------------
+
+df_dim_produtos = pd.read_parquet(
+    pasta_staging_parquet /
+    'DIM_PRODUTOS_KRONA.parquet'
+)
+
+dim_idx = (
+    df_dim_produtos
+    .drop_duplicates(subset=['COD_PROD'])
+    .set_index('COD_PROD')
+)
 
 map_cols = {
     'DESC_PROD': 'DESC_PRODUTO',
@@ -68,81 +205,357 @@ map_cols = {
 }
 
 for col_dim, col_df in map_cols.items():
-    novo = df_forecast_vendas_krona_PRODUTO['COD_PROD'].map(dim_idx[col_dim])
+
+    novo = (
+        df_forecast_vendas_krona_PRODUTO['COD_PROD']
+        .map(dim_idx[col_dim])
+    )
 
     if col_df in df_forecast_vendas_krona_PRODUTO.columns:
-        df_forecast_vendas_krona_PRODUTO[col_df] = novo.fillna(
-            df_forecast_vendas_krona_PRODUTO[col_df]
+
+        df_forecast_vendas_krona_PRODUTO[col_df] = (
+            novo.fillna(
+                df_forecast_vendas_krona_PRODUTO[col_df]
+            )
         )
+
     else:
+
         df_forecast_vendas_krona_PRODUTO[col_df] = novo
 
 
-# Agrupar dados df_plano_consenso_regional somando os valores de DEMANDA_PLANEJADA
-colunas_agrupamento = ['REGIONAL_GESTOR', 'REGIONAL', 'FAMILIA', 'PERIODO', 'CICLO']
-df_plano_consenso_regional_grouped = df_plano_consenso_regional.groupby(colunas_agrupamento)['VALOR'].sum().reset_index()
+if existe_plano_cliente:
 
-ciclo_plano =  df_plano_consenso_regional_grouped['CICLO'].iloc[0]
+    print(
+        "✅ Arquivos importados. "
+        "Plano regional e plano cliente encontrados."
+    )
 
-print("✅ Arquivos importados e preparados com sucesso!")
+else:
+
+    print(
+        "⚠️ Plano cliente não encontrado para o ciclo/revisão atual. "
+        "O processo utilizará somente o plano regional."
+    )
 
 # %%
 # 📥 Desagregação do plano REGIONAL
 
-# Calculando a participação da cada linha de produto no volume total da combinação de chaves - REGIONAL_GESTOR, REGIONAL, FAMILIA, PERIODO
-df_volume_desag_regional = df_forecast_vendas_krona_PRODUTO.copy()
+df_volume_desag_regional = (
+    df_forecast_vendas_krona_PRODUTO.copy()
+)
 
-chaves = ['REGIONAL_GESTOR', 'REGIONAL', 'FAMILIA', 'PERIODO']
+chaves_regional = [
+    'REGIONAL_GESTOR',
+    'REGIONAL',
+    'FAMILIA',
+    'PERIODO'
+]
 
-# total por combinação
-df_volume_desag_regional['TOTAL'] = df_volume_desag_regional.groupby(chaves)['VOL_PREV'].transform('sum')
+# Total estatístico dentro da regional, família e período
+df_volume_desag_regional['TOTAL_REGIONAL'] = (
+    df_volume_desag_regional
+    .groupby(
+        chaves_regional,
+        dropna=False
+    )['VOL_PREV']
+    .transform('sum')
+)
 
-# participação da linha dentro da combinação
-df_volume_desag_regional['PARTIC'] = np.where(
-    df_volume_desag_regional['TOTAL'] > 0,
-    df_volume_desag_regional['VOL_PREV'] / df_volume_desag_regional['TOTAL'],
+# Participação estatística da linha dentro da regional
+df_volume_desag_regional['PARTIC_REGIONAL'] = np.where(
+    df_volume_desag_regional['TOTAL_REGIONAL'] > 0,
+    (
+        df_volume_desag_regional['VOL_PREV'] /
+        df_volume_desag_regional['TOTAL_REGIONAL']
+    ),
     0
 )
 
-# Mesclar participação com o plano consenso regional unificado
+# Mesclar com o plano consenso regional
 df_volume_desag_regional = pd.merge(
     df_volume_desag_regional,
     df_plano_consenso_regional_grouped,
-    on=chaves,
+    on=chaves_regional,
     how='left'
 )
 
-# Renomear colunas VALOR E VOL_PREV para evitar conflitos
-df_volume_desag_regional.rename(columns={'VOL_PREV': 'VOL_ESTATISTICO'}, inplace=True)
-df_volume_desag_regional.rename(columns={'VALOR': 'VOL_CONSENSO'}, inplace=True)
-
-# Calcular desagregação
-df_volume_desag_regional['VOL_CONSENSO_DESAGREGADO'] = df_volume_desag_regional['PARTIC'] * df_volume_desag_regional['VOL_CONSENSO']
-
-print("✅ Percentuais de desagregação calculados e concluídos!")
-
-# %%
-# Transformar plano desagregado e peças e criar  o formato final, incluindo as colunas necessárias
-df_plano_final_krona = df_volume_desag_regional.copy()
-
-# Carregar parquet Dim_Produtos_Vendas_krona para buscar peso unitário
-df_dim_produtos = pd.read_parquet(pasta_staging_parquet / 'DIM_PRODUTOS_KRONA.parquet')
-
-# Mesclar peso unitário com o plano final
-df_plano_final_krona = pd.merge(
-    df_plano_final_krona,
-    df_dim_produtos[['COD_PROD', 'PESO_UNIT']],
-    on=['COD_PROD'],
-    how='left'
+df_volume_desag_regional.rename(
+    columns={
+        'VOL_PREV': 'VOL_ESTATISTICO',
+        'VALOR': 'VOL_CONSENSO_REGIONAL'
+    },
+    inplace=True
 )
 
-df_plano_final_krona['QTD_CONSENSO'] = df_plano_final_krona['VOL_CONSENSO_DESAGREGADO'] / df_plano_final_krona['PESO_UNIT']
-df_plano_final_krona['QTD_ESTATISTICO'] = df_plano_final_krona['VOL_ESTATISTICO'] / df_plano_final_krona['PESO_UNIT']
+# Ausência de valor regional será considerada zero
+df_volume_desag_regional['VOL_CONSENSO_REGIONAL'] = (
+    df_volume_desag_regional['VOL_CONSENSO_REGIONAL']
+    .fillna(0)
+)
 
-# Adicionar coluna de versão do plano
-df_plano_final_krona['CICLO'] = ciclo_plano
+df_volume_desag_regional[
+    'VOL_CONSENSO_REGIONAL_DESAGREGADO'
+] = (
+    df_volume_desag_regional['PARTIC_REGIONAL'] *
+    df_volume_desag_regional['VOL_CONSENSO_REGIONAL']
+)
 
 print("✅ Desagregação do plano REGIONAL concluída!")
+
+# %%
+# 📥 Desagregação do plano CLIENTE
+
+# A desagregação cliente parte exatamente das mesmas linhas
+# utilizadas na desagregação regional
+df_volume_desag_cliente = (
+    df_forecast_vendas_krona_PRODUTO.copy()
+)
+
+chaves_cliente = [
+    'COD_CLIENTE',
+    'REGIONAL_GESTOR',
+    'REGIONAL',
+    'FAMILIA',
+    'PERIODO'
+]
+
+# Criar colunas padrão
+df_volume_desag_cliente['TOTAL_CLIENTE'] = 0.0
+df_volume_desag_cliente['PARTIC_CLIENTE'] = 0.0
+df_volume_desag_cliente['VOL_CONSENSO_CLIENTE'] = 0.0
+
+df_volume_desag_cliente[
+    'VOL_CONSENSO_CLIENTE_DESAGREGADO'
+] = 0.0
+
+df_volume_desag_cliente['PLANO_CLIENTE_ATIVO'] = False
+
+
+if existe_plano_cliente:
+
+    # Validar se a previsão possui a chave do cliente
+    if 'COD_CLIENTE' not in df_volume_desag_cliente.columns:
+
+        raise KeyError(
+            "A coluna COD_CLIENTE não existe no arquivo "
+            "df_forecast_vendas_krona_PRODUTO.parquet."
+        )
+
+    # Total estatístico por cliente, regional, família e período
+    df_volume_desag_cliente['TOTAL_CLIENTE'] = (
+        df_volume_desag_cliente
+        .groupby(
+            chaves_cliente,
+            dropna=False
+        )['VOL_PREV']
+        .transform('sum')
+    )
+
+    # Participação do produto dentro do planejamento do cliente
+    df_volume_desag_cliente['PARTIC_CLIENTE'] = np.where(
+        df_volume_desag_cliente['TOTAL_CLIENTE'] > 0,
+        (
+            df_volume_desag_cliente['VOL_PREV'] /
+            df_volume_desag_cliente['TOTAL_CLIENTE']
+        ),
+        0
+    )
+
+    # Mesclar previsão estatística com plano cliente
+    df_volume_desag_cliente = pd.merge(
+        df_volume_desag_cliente.drop(
+            columns=[
+                'VOL_CONSENSO_CLIENTE',
+                'VOL_CONSENSO_CLIENTE_DESAGREGADO',
+                'PLANO_CLIENTE_ATIVO'
+            ],
+            errors='ignore'
+        ),
+        df_plano_consenso_cliente_grouped,
+        on=chaves_cliente,
+        how='left'
+    )
+
+    df_volume_desag_cliente.rename(
+        columns={
+            'VALOR': 'VOL_CONSENSO_CLIENTE'
+        },
+        inplace=True
+    )
+
+    # Cliente sem registro ou com valor nulo será tratado como zero
+    df_volume_desag_cliente['VOL_CONSENSO_CLIENTE'] = (
+        df_volume_desag_cliente['VOL_CONSENSO_CLIENTE']
+        .fillna(0)
+    )
+
+    # O plano cliente somente é ativo quando o valor é maior que zero
+    #
+    # VALOR > 0:
+    #     cliente efetivamente realizou o planejamento
+    #
+    # VALOR = 0:
+    #     cliente optou por não realizar o planejamento
+    #     e deverá utilizar o regional
+    #
+    # registro inexistente:
+    #     também deverá utilizar o regional
+    df_volume_desag_cliente['PLANO_CLIENTE_ATIVO'] = (
+        df_volume_desag_cliente['VOL_CONSENSO_CLIENTE'] > 0
+    )
+
+    # Desagregar somente os planos cliente efetivamente ativos
+    df_volume_desag_cliente[
+        'VOL_CONSENSO_CLIENTE_DESAGREGADO'
+    ] = np.where(
+        df_volume_desag_cliente['PLANO_CLIENTE_ATIVO'],
+        (
+            df_volume_desag_cliente['PARTIC_CLIENTE'] *
+            df_volume_desag_cliente['VOL_CONSENSO_CLIENTE']
+        ),
+        0
+    )
+
+    print("✅ Desagregação do plano CLIENTE concluída!")
+
+else:
+
+    print(
+        "⚠️ Não existe plano cliente ativo para o ciclo atual. "
+        "A demanda regional será utilizada integralmente."
+    )
+
+# %%
+# Unificar demanda REGIONAL e CLIENTE
+
+df_plano_final_krona = (
+    df_volume_desag_regional.copy()
+)
+
+# Trazer somente as informações calculadas na desagregação cliente
+colunas_cliente_unificacao = [
+    'ID_LINHA_DESAG',
+    'TOTAL_CLIENTE',
+    'PARTIC_CLIENTE',
+    'VOL_CONSENSO_CLIENTE',
+    'VOL_CONSENSO_CLIENTE_DESAGREGADO',
+    'PLANO_CLIENTE_ATIVO'
+]
+
+df_plano_final_krona = pd.merge(
+    df_plano_final_krona,
+    df_volume_desag_cliente[colunas_cliente_unificacao],
+    on='ID_LINHA_DESAG',
+    how='left'
+)
+
+# Garantir valores padrão quando não existir plano cliente
+df_plano_final_krona['TOTAL_CLIENTE'] = (
+    df_plano_final_krona['TOTAL_CLIENTE']
+    .fillna(0)
+)
+
+df_plano_final_krona['PARTIC_CLIENTE'] = (
+    df_plano_final_krona['PARTIC_CLIENTE']
+    .fillna(0)
+)
+
+df_plano_final_krona['VOL_CONSENSO_CLIENTE'] = (
+    df_plano_final_krona['VOL_CONSENSO_CLIENTE']
+    .fillna(0)
+)
+
+df_plano_final_krona[
+    'VOL_CONSENSO_CLIENTE_DESAGREGADO'
+] = (
+    df_plano_final_krona[
+        'VOL_CONSENSO_CLIENTE_DESAGREGADO'
+    ]
+    .fillna(0)
+)
+
+df_plano_final_krona['PLANO_CLIENTE_ATIVO'] = (
+    df_plano_final_krona['PLANO_CLIENTE_ATIVO']
+    .fillna(False)
+    .astype(bool)
+)
+
+# -------------------------------------------------------------------------
+# REGRA FINAL
+# -------------------------------------------------------------------------
+#
+# Se o plano cliente for maior que zero:
+#     usar o plano cliente desagregado
+#
+# Se o plano cliente for zero, nulo ou inexistente:
+#     usar o plano regional desagregado
+#
+df_plano_final_krona['VOL_CONSENSO_DESAGREGADO'] = np.where(
+    df_plano_final_krona['PLANO_CLIENTE_ATIVO'],
+    df_plano_final_krona[
+        'VOL_CONSENSO_CLIENTE_DESAGREGADO'
+    ],
+    df_plano_final_krona[
+        'VOL_CONSENSO_REGIONAL_DESAGREGADO'
+    ]
+)
+
+df_plano_final_krona['ORIGEM_DEMANDA'] = np.where(
+    df_plano_final_krona['PLANO_CLIENTE_ATIVO'],
+    'CLIENTE',
+    'REGIONAL'
+)
+
+
+# -------------------------------------------------------------------------
+# CONVERTER VOLUME PARA PEÇAS
+# -------------------------------------------------------------------------
+
+df_dim_produtos = pd.read_parquet(
+    pasta_staging_parquet /
+    'DIM_PRODUTOS_KRONA.parquet'
+)
+
+df_plano_final_krona = pd.merge(
+    df_plano_final_krona,
+    (
+        df_dim_produtos[
+            ['COD_PROD', 'PESO_UNIT']
+        ]
+        .drop_duplicates(subset=['COD_PROD'])
+    ),
+    on='COD_PROD',
+    how='left'
+)
+
+# Evitar divisão por zero
+df_plano_final_krona['QTD_CONSENSO'] = np.where(
+    df_plano_final_krona['PESO_UNIT'] > 0,
+    (
+        df_plano_final_krona[
+            'VOL_CONSENSO_DESAGREGADO'
+        ] /
+        df_plano_final_krona['PESO_UNIT']
+    ),
+    0
+)
+
+df_plano_final_krona['QTD_ESTATISTICO'] = np.where(
+    df_plano_final_krona['PESO_UNIT'] > 0,
+    (
+        df_plano_final_krona['VOL_ESTATISTICO'] /
+        df_plano_final_krona['PESO_UNIT']
+    ),
+    0
+)
+
+df_plano_final_krona['CICLO'] = ciclo_plano
+
+print("✅ Planos REGIONAL e CLIENTE unificados com sucesso!")
+
+# %%
+
 
 # %%
 # Gerar saída previsão de vendas em excel, com colunas específicas para arquivo do Gabriel
