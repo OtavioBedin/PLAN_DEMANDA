@@ -1,4 +1,9 @@
-# %%
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
 # Importando bibliotecas
 from functions import *
 import pandas as pd
@@ -18,11 +23,12 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_percentage_error
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
 import os
 
 logging.basicConfig(level=logging.WARNING, format='%(message)s')
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 timer = Temporizador()
 timer.iniciar()
@@ -62,7 +68,10 @@ pasta_validacao_anna = caminho_base.parent / '06_VALIDACAO_ANNA'
 
 print("✅ Mapeamento de pastas concluído com sucesso!")
 
-# %%
+
+# In[2]:
+
+
 # Carregar dados arquivo KRONA_REGRAS
 caminho_arquivo = arquivo_input_regras_negocio
 
@@ -126,7 +135,10 @@ df_periodo_previsao = df_periodo_previsao.sort_values(by='PERIODO_PROJECAO').res
 
 print("✅ Importação e tratamento de dados do arquivo KRONA_REGRAS, concluídos com sucesso!")
 
-# %%
+
+# In[3]:
+
+
 # Script para eliminar duplicação de Chv_Cliente no Dim_Clientes_Krona, conforme orientado por Marcos TI, criamos essa rotina para encontrar as duplicações, eliminar e gerar novo Parquet sem duplicações.
 
 # Carregar o Parquet
@@ -141,7 +153,10 @@ df_dim_cli_krona.to_parquet(pasta_input_parquet / "Dim_Clientes_Krona.parquet", 
 del df_dim_cli_krona
 gc.collect()
 
-# %%
+
+# In[4]:
+
+
 # Criando uma DIM_PRODUTOS_KRONA organizada e resumida, para consumir dados de produtos e principalmente peso unitário
 
 # Carregando DIM_PRODUTOS_VENDAS_KRONA, filtrando Nom_Empresa que contenha "Krona" para eliminar produtos de outras empresas que possam estar na base, e selecionando apenas as colunas necessárias para o planejamento de demanda
@@ -172,7 +187,10 @@ dim_produtos.rename(columns={"Cod_Produto": "COD_PROD", "Des_Produto": "DESC_PRO
 # Salvar na pasta staging em formato parquet para uso posterior
 dim_produtos.to_parquet(pasta_staging_parquet / "DIM_PRODUTOS_KRONA.parquet", index=False)
 
-# %%
+
+# In[5]:
+
+
 # # FIXME apagar depois da Anna validar
 # # Filtrado Ano 2024 conforme solicitado por Karolina
 
@@ -425,7 +443,10 @@ dim_produtos.to_parquet(pasta_staging_parquet / "DIM_PRODUTOS_KRONA.parquet", in
 
 # print("✅ Carregamento de VALIDACAO_FINAL_DATA_EMISSAO_COTA concluído com sucesso!")
 
-# %%
+
+# In[6]:
+
+
 # # FIXME teste para Anna
 
 # output = (pasta_validacao_anna / "VALIDACAO_FINAL_DATA_EMISSAO_COTA.parquet").as_posix()
@@ -435,7 +456,10 @@ dim_produtos.to_parquet(pasta_staging_parquet / "DIM_PRODUTOS_KRONA.parquet", in
 # excel_output = (pasta_validacao_anna / "VALIDACAO_FINAL_DATA_EMISSAO_COTA.xlsx").as_posix()
 # df.to_excel(excel_output, index=False)
 
-# %%
+
+# In[7]:
+
+
 empresa = 'Krona'
 vendas = (pasta_input_parquet / "Fato_Vendas_Krona.parquet").as_posix()
 produtos = (pasta_input_parquet / "Dim_Produtos_Vendas_Krona.parquet").as_posix()
@@ -585,7 +609,10 @@ gc.collect()
 
 print("✅ Carregamento de df_vendas_krona_silver concluído com sucesso!")
 
-# %%
+
+# In[ ]:
+
+
 # ============================================================
 # 1. Criando coluna REGIONAL copiando a coluna REGIAO_CLIENTE 
 #    no df_vendas_krona. 
@@ -619,7 +646,7 @@ ajuste AS (
     CASE
       -- >>> ADICIONADO: override por cliente (se existir na df_direc_cli_regional)
       WHEN d.REGIONAL IS NOT NULL AND d.REGIONAL <> '' THEN d.REGIONAL
-      
+
       -- 1) Se SEGMENTO contém CONSTRUTORA ou INSTALADOR => usa de-para
       WHEN b.SEG_UP LIKE '%CONSTRUTORA%' OR b.SEG_UP LIKE '%INSTALADOR%'
         THEN COALESCE(m."REGIONAL ATUALIZADA", b.RC_FIX)
@@ -714,6 +741,9 @@ colunas_ordenadas = [
 
 df_vendas_krona_gold = df_vendas_krona_gold[colunas_ordenadas]
 
+# Conforme alinhado com Karol, excluir REGIONAL = DIRETO KRONA
+df_vendas_krona_gold = df_vendas_krona_gold[df_vendas_krona_gold["REGIONAL"] != "DIRETO KRONA"]
+
 # Salvar df_vendas_krona_gold em Parquet para salvar as alterações, filtros e regras aplicadas no histórico, otimizando memória e garantindo rastreabilidade
 df_vendas_krona_gold.to_parquet(pasta_staging_parquet / "df_vendas_krona_gold.parquet", index=False)
 
@@ -722,7 +752,10 @@ gc.collect()
 
 print("✅ Organização de Regionais e Inserção de Regional Gestor na df_vendas_krona_gold concluídos com sucesso!")
 
-# %%
+
+# In[9]:
+
+
 # # FIXME: Gerar arquivo de saída para validação Anna
 # df_vendas_krona_gold = pd.read_parquet(pasta_staging_parquet / "df_vendas_krona_gold.parquet")
 
@@ -757,7 +790,10 @@ print("✅ Organização de Regionais e Inserção de Regional Gestor na df_vend
 # del df_vendas_krona_gold, df_validacao_anna
 # gc.collect()
 
-# %%
+
+# In[10]:
+
+
 # Aplicar produtos a eliminar no df_vendas_krona_gold, e excluir os produtos listados na variavel produtos_a_eliminar vinda do arquivo de regras de negócio
 df_vendas_krona = pd.read_parquet(pasta_staging_parquet / "df_vendas_krona_gold.parquet")
 lista_produtos_eliminar = set(produtos_a_eliminar['COD_PROD'])
@@ -769,7 +805,9 @@ gc.collect()
 
 print("✅ Eliminação de produtos concluída!")
 
-# %%
+
+# In[11]:
+
 
 # Criar demanda de lançamento, conforme regras alinhadas com a Anna
 
@@ -963,7 +1001,10 @@ gc.collect()
 
 print("✅ Demanda de lançamento ajustada e concluída!")
 
-# %%
+
+# In[12]:
+
+
 # Retirar do histórico df_vendas_krona os produtos de lançamento, ajustar a demanda lançamento utilizando esse histórico, e gerar um parquet pronto com a demanda de lançamento ajustada para consumo no painel e análises futuras
 
 # Carregando o df_vendas_krona
@@ -988,7 +1029,10 @@ gc.collect()
 
 print("✅ Separação de históricos de produtos de lançamento concluída!")
 
-# %%
+
+# In[13]:
+
+
 # 🦆 Exportação de Dados Vendas para Planejamento Colaborativo
 # 🎯 Objetivo: Exportar CSV para o Plano Colaborativo
 
@@ -1041,7 +1085,10 @@ df_hist_vend_CLIENTE.to_csv(
     float_format="%.2f"
 )
 
-# %%
+
+# In[14]:
+
+
 # Gerar os arquivos com média de vendas para Planejamento Colaborativo Agregado
 # Encontrar o primeiro dia do mês atual
 
@@ -1104,7 +1151,9 @@ df_media_vendas_PRODUTO.to_csv(
     float_format="%.2f"
 )
 
-# %%
+
+# In[15]:
+
 
 # Gerar os arquivos com média de vendas para Planejamento Colaborativo por Cliente
 # Encontrar o primeiro dia do mês atual
@@ -1178,7 +1227,10 @@ gc.collect()
 
 print("✅ Bases de Vendas para Planejamento Colaborativo geradas com sucesso!")
 
-# %%
+
+# In[16]:
+
+
 # ============================================================
 # 🧩 HISTÓRICO DOS MODELOS TESTADOS NO PROJETO
 # ============================================================
@@ -1498,7 +1550,10 @@ print("✅ Bases de Vendas para Planejamento Colaborativo geradas com sucesso!")
 #   cada série
 # ============================================================
 
-# %%
+
+# In[ ]:
+
+
 timer.iniciar()
 
 # ===========================
@@ -1551,20 +1606,27 @@ def metric(y_true, y_pred) -> float:
 # 4) MODELOS (ARIMA REMOVIDO)
 # ============================================================
 def pred_hw(y_train, steps):
-    try:
-        m = ExponentialSmoothing(
-            y_train, trend="add", seasonal="multiplicative", seasonal_periods=12
-        ).fit()
-        return np.maximum(m.forecast(steps), 0)
-    except Exception:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConvergenceWarning)
+
         try:
             m = ExponentialSmoothing(
-                y_train, trend="add", seasonal="additive", seasonal_periods=12
+                y_train, trend="add", seasonal="multiplicative", seasonal_periods=12
             ).fit()
             return np.maximum(m.forecast(steps), 0)
+
         except Exception:
-            m = ExponentialSmoothing(y_train, trend="add", seasonal=None).fit()
-            return np.maximum(m.forecast(steps), 0)
+            try:
+                m = ExponentialSmoothing(
+                    y_train, trend="add", seasonal="additive", seasonal_periods=12
+                ).fit()
+                return np.maximum(m.forecast(steps), 0)
+
+            except Exception:
+                m = ExponentialSmoothing(
+                    y_train, trend="add", seasonal=None
+                ).fit()
+                return np.maximum(m.forecast(steps), 0)
 
 def pred_lr(y_train, steps):
     y_train = np.asarray(y_train, dtype=float)
@@ -2136,7 +2198,10 @@ try:
 finally:
     timer.finalizar()
 
-# %%
+
+# In[18]:
+
+
 # ============================================================
 # DESAGREGAÇÃO DO FORECAST ESTATÍSTICO (HISTÓRICO + FUTURO)
 # SAÍDA ÚNICA: df_prev_krona.parquet (HIST + FUT)
@@ -2282,7 +2347,9 @@ del df_prev_krona
 gc.collect()
 
 
-# %%
+# In[19]:
+
+
 # Separar a df_forecast_vendas_krona em dois dataframes:
 # df_forecast_vendas_krona_CLIENTE: clientes que terão planejamento de demanda
 # df_forecast_vendas_krona_PRODUTO: produtos que terão planejamento de demanda
@@ -2306,7 +2373,7 @@ if lista_clientes_plan_demanda and len(lista_clientes_plan_demanda) > 0:
 else:
     # Se não existe cliente para plan. demanda → tudo produto
     df_forecast_vendas_krona['NIVEL_PLAN_DEMANDA'] = 'PRODUTO'
-    
+
 # Separar os dataframes com cópia explícita
 df_forecast_vendas_krona_CLIENTE = df_forecast_vendas_krona[df_forecast_vendas_krona['NIVEL_PLAN_DEMANDA'] == 'CLIENTE'].copy()
 df_forecast_vendas_krona_PRODUTO = df_forecast_vendas_krona[df_forecast_vendas_krona['NIVEL_PLAN_DEMANDA'] == 'PRODUTO'].copy()
@@ -2381,5 +2448,4 @@ gc.collect()
 
 timer.finalizar()
 print("🎯 Processo concluído com sucesso!")
-
 
