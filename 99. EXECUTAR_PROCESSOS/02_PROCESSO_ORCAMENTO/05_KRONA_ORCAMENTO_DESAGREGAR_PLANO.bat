@@ -5,12 +5,12 @@ mode con: cols=140 lines=40
 for %%I in ("%~dp0..\..") do set "PASTA_RAIZ=%%~fI\"
 set "PASTA_SCRIPTS=%PASTA_RAIZ%00_SCRIPTS"
 set "PYTHON_EXE=%PASTA_RAIZ%.venv\Scripts\python.exe"
-set "ARQUIVO_IPYNB=05_KRONA_ORCAMENTO_ESTAT_DADOS_PAINEL.ipynb"
-set "ARQUIVO_PY=05_KRONA_ORCAMENTO_ESTAT_DADOS_PAINEL.py"
+set "ARQUIVO_IPYNB=05_KRONA_ORCAMENTO_DESAGREGAR_PLANO.ipynb"
+set "ARQUIVO_PY=05_KRONA_ORCAMENTO_DESAGREGAR_PLANO.py"
 
 echo.
 echo ============================================================
-echo EXECUCAO DO ORCAMENTO ESTATISTICO - DADOS PARA O PAINEL
+echo EXECUCAO DA DESAGREGACAO DO PLANO DE ORCAMENTO
 echo ============================================================
 echo.
 echo Pasta raiz:
