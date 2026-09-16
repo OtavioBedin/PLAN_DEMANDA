@@ -5,12 +5,12 @@ mode con: cols=140 lines=40
 for %%I in ("%~dp0..\..") do set "PASTA_RAIZ=%%~fI\"
 set "PASTA_SCRIPTS=%PASTA_RAIZ%00_SCRIPTS"
 set "PYTHON_EXE=%PASTA_RAIZ%.venv\Scripts\python.exe"
-set "ARQUIVO_IPYNB=01_KRONA_ORGANIZAR_HIST_VEND_ESTAT.ipynb"
-set "ARQUIVO_PY=01_KRONA_ORGANIZAR_HIST_VEND_ESTAT.py"
+set "ARQUIVO_IPYNB=99_KRONA_ESTATISTICO_POWER_BI.ipynb"
+set "ARQUIVO_PY=99_KRONA_ESTATISTICO_POWER_BI.py"
 
 echo.
 echo ============================================================
-echo EXECUCAO DO HISTORICO ESTATISTICO
+echo EXECUCAO DO ESTATISTICO POWER BI
 echo ============================================================
 echo.
 echo Pasta raiz:
